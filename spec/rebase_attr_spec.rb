@@ -1,7 +1,7 @@
 require 'rebase_attr'
 
 class RebaseTestBase
-  attr_writer :x
+  attr_accessor :x
 end
 
 # This converts options to local varaibels so they can be used inside the Class.new { }
@@ -14,16 +14,6 @@ describe RebaseAttr::Generator do
   shared_examples_for "values" do
     subject(:instance) { klass.new }
 
-    describe "reader" do
-      before { instance.instance_eval { @x = decoded } }
-      its(:x) { should == encoded }
-    end
-
-    describe "writer" do
-      before { instance.x = encoded }
-      specify { expect(instance.instance_eval { @x }).to eq(decoded) }
-    end
-
     describe "#encode" do
       specify { expect(klass.encode_x(decoded)).to eq(encoded) }
       specify { expect(instance.encode_x(decoded)).to eq(encoded) }
@@ -33,44 +23,65 @@ describe RebaseAttr::Generator do
       specify { expect(klass.decode_x(encoded)).to eq(decoded) }
       specify { expect(instance.decode_x(encoded)).to eq(decoded) }
     end
+
+    describe "reader" do
+      before { d = decoded; instance.instance_eval { @x = d } } # converting decoded to local variable so I can use it inside instance_eval
+      its(:x) { should == encoded }
+    end
+
+    describe "writer" do
+      before { instance.x = encoded }
+      specify { expect(instance.instance_eval { @x }).to eq(decoded) }
+    end
   end
 
   # requires: from, to, convert_name, convert_block, decoded_default, decoded_from,
-  #           encoded_default, encoded_convert
+  #           decoded_convert, decoded_convert_from, encoded_default, encoded_convert
   shared_context "all except readable" do
-    context "default" do
-      let(:klass) { rebase_class to: to }
-      let(:decoded) { decoded_default }
-      let(:encoded) { encoded_default }
-      it_behaves_like "values"
+    context "without from" do
+      context "not converted" do
+        let(:klass) { rebase_class to: to }
+        let(:decoded) { decoded_default }
+        let(:encoded) { encoded_default }
+        it_behaves_like "values"
+      end
+
+      context "converted" do
+        context "named" do
+          let(:klass) { rebase_class to: to, convert: convert_name, deconvert: deconvert }
+          let(:decoded) { decoded_default }
+          let(:encoded) { encoded_convert }
+          it_behaves_like "values"
+        end
+
+        context "block" do
+          let(:klass) { rebase_class to: to, convert: convert_block, deconvert: deconvert }
+          let(:decoded) { decoded_default }
+          let(:encoded) { encoded_convert }
+          it_behaves_like "values"
+        end
+      end
     end
 
     context "from" do
-      let(:klass) { rebase_class from: from, to: to }
-      let(:decoded) { decoded_from }
-      let(:encoded) { encoded_default }
-      it_behaves_like "values"
-    end
-
-    context "converted" do
-      context "named" do
-        let(:klass) { rebase_class to: to, convert: convert_name }
-        let(:decoded) { decoded_default }
-        let(:encoded) { encoded_convert }
+      context "not converted" do
+        let(:klass) { rebase_class from: from, to: to }
+        let(:decoded) { decoded_from }
+        let(:encoded) { encoded_default }
         it_behaves_like "values"
       end
 
-      context "block" do
-        let(:klass) { rebase_class to: to, convert: convert_block }
-        let(:decoded) { decoded_default }
+      context "converted" do
+        let(:klass) { rebase_class from: from, to: to, convert: convert_name, deconvert: deconvert }
+        let(:decoded) { decoded_from }
         let(:encoded) { encoded_convert }
         it_behaves_like "values"
       end
     end
   end
 
-  # requires: from, to, convert_name, convert_block, decoded_default, decoded_from,
-  #           encoded_default, encoded_convert, encoded_readable, encoded_convert_readable
+  # requires: from, to, convert_name, convert_block, decoded_default, decoded_from, decoded_convert,
+  #           decoded_convert_from, encoded_default, encoded_convert, encoded_readable, encoded_convert_readable
   shared_context "allows readable" do
     include_context "all except readable"
 
@@ -84,7 +95,7 @@ describe RebaseAttr::Generator do
         end
 
         context "converted" do
-          let(:klass) { rebase_class to: to, readable: true, convert: convert_name }
+          let(:klass) { rebase_class to: to, readable: true, convert: convert_name, deconvert: deconvert }
           let(:decoded) { decoded_default }
           let(:encoded) { encoded_convert_readable }
           it_behaves_like "values"
@@ -100,7 +111,7 @@ describe RebaseAttr::Generator do
         end
 
         context "converted" do
-          let(:klass) { rebase_class from: from, to: to, readable: true, convert: convert_name }
+          let(:klass) { rebase_class from: from, to: to, readable: true, convert: convert_name, deconvert: deconvert }
           let(:decoded) { decoded_from }
           let(:encoded) { encoded_convert_readable }
           it_behaves_like "values"
@@ -119,12 +130,14 @@ describe RebaseAttr::Generator do
   let(:from) { 8 }
   let(:convert_name) { :upcase }
   let(:convert_block) { -> (x) { x.send(convert_name) } }
+  let(:deconvert) { nil }
   let(:decoded_default) { 31756185168571 }
   let(:decoded_from) { "716072010565273" }
 
   context "base 2" do
     let(:to) { 2 }
     let(:convert_name) { :chop }
+    let(:deconvert) { -> (x) { x + "1" } }
     let(:encoded_default) { "111001110000111010000001000101110101010111011" }
     let(:encoded_convert) { "11100111000011101000000100010111010101011101" }
     let(:encoded_readable) { "yyyxxyyyxxxxyyyxyxxxxxxyxxxyxyyyxyxyxyxyyyxyy" }
@@ -137,6 +150,7 @@ describe RebaseAttr::Generator do
     let(:to) { 8 }
     let(:from) { 7 }
     let(:convert_name) { :chop }
+    let(:deconvert) { -> (x) { x + "3" } }
     let(:decoded_from) { "6455210605126033" }
     let(:encoded_default) { "716072010565273" }
     let(:encoded_convert) { "71607201056527" }
@@ -150,8 +164,8 @@ describe RebaseAttr::Generator do
     let(:to) { 16 }
     let(:encoded_default) { "1ce1d022eabb" }
     let(:encoded_convert) { "1CE1D022EABB" }
-    let(:encoded_readable) { "xcexdw22eabb" }
-    let(:encoded_convert_readable) { "XCEXDW22EABB" }
+    let(:encoded_readable) { "yceydx22eabb" }
+    let(:encoded_convert_readable) { "YCEYDX22EABB" }
 
     include_context "allows readable"
   end
@@ -183,23 +197,23 @@ describe RebaseAttr::Generator do
       let(:klass) { rebase_class(to: 16) }
       let(:instance) { klass.new }
 
-      describe "encode_x" do
-        specify { expect { klass.encode_x(:a) }.to raiser_error(TypeError, "value must implement #to_i, :a given") }
-        specify { expect { instance.encode_x(:a) }.to raiser_error(TypeError, "value must implement #to_i, :a given") }
+      describe "#encode" do
+        specify { expect { klass.encode_x(:a) }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
+        specify { expect { instance.encode_x(:a) }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
       end
 
-      describe "decode_x" do
-        specify { expect { klass.decode_x(:a) }.to raiser_error(TypeError, "value must implement #to_i, :a given") }
-        specify { expect { instance.decode_x(:a) }.to raiser_error(TypeError, "value must implement #to_i, :a given") }
-      end
-
-      describe "writer" do
-        specify { expect { instance.x = :a }.to raiser_error(TypeError, "value must implement #to_i, :a given") }
+      describe "#decode" do
+        specify { expect { klass.decode_x(:a) }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
+        specify { expect { instance.decode_x(:a) }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
       end
 
       describe "reader" do
         before { instance.instance_eval { @x = :a } }
-        specify { expect { instance.x }.to raiser_error(TypeError, "value must implement #to_i, :a given") }
+        specify { expect { instance.x }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
+      end
+
+      describe "writer" do
+        specify { expect { instance.x = :a }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
       end
     end
   end

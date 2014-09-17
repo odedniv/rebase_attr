@@ -80,7 +80,7 @@ rebase_attr :x, :y, from: 8, to: 2, convert: -> (v) { "b#{v}" }, deconvert: -> (
 
 ## Contributing
 
-1. Fork it ( https://github.com/[my-github-username]/rebase_attr/fork )
+1. Fork it ( https://github.com/odedniv/rebase_attr/fork )
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)

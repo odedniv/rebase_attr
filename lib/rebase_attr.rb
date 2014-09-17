@@ -4,7 +4,7 @@ module RebaseAttr
   READABLE_MAPPING = { '0' => 'x', '1' => 'y', 'l' => 'w', 'o' => 'z' }
 
   module Generator
-    def rebase_attr(*attributes, to: nil, from: nil, convert: nil, deconvert: nil, readable: nil)
+    def rebase_attr(*attributes, to: nil, from: nil, convert: nil, deconvert: nil, readable: false)
       raise ArgumentError, "#rebase_attr must receive :to" unless to
       raise ArgumentError, "#rebase_attr does not accept a block, did you mean to use :convert?" if block_given?
       raise ArgumentError, "#rebase_attr does not allow :readable option with bases higher than 32, #{to} given" if readable and to > 32
@@ -27,12 +27,18 @@ module RebaseAttr
         define_singleton_method :"decode_#{attr}" do |encoded|
           result = encoded
           if deconvert
-            result = result.clone # deconvert to not modify outside variable
+            begin
+              result = result.clone # deconvert to not modify outside variable
+            rescue TypeError # can't clone, immutable
+            end
             result = deconvert.respond_to?(:call) ? deconvert.call(result) : result.public_send(deconvert)
           end
           raise TypeError, "encoded value must implement #to_i, #{result.inspect} given" unless result.respond_to?(:to_i)
           if readable
-            result = result.clone # not modifying outside variable
+            begin
+              result = result.clone # not modifying outside variable
+            rescue TypeError # can't clone, immutable
+            end
             READABLE_MAPPING.each { |s, d| result.gsub!(/#{d}/i, s) } # gsub! to conserve memory
           end
           result = result.to_i(to)

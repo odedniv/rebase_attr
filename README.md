@@ -1,4 +1,4 @@
-# rebase_attr
+# rebase_attr [![Gem Version](https://badge.fury.io/rb/attr_rebase.svg)](http://badge.fury.io/rb/attr_rebase)
 
 Convert an attribute to a specified base.
 

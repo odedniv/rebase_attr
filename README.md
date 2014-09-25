@@ -1,4 +1,4 @@
-# rebase_attr [![Gem Version](https://badge.fury.io/rb/attr_rebase.svg)](http://badge.fury.io/rb/attr_rebase)
+# rebase_attr [![Gem Version](https://badge.fury.io/rb/rebase_attr.svg)](http://badge.fury.io/rb/rebase_attr)
 
 Convert an attribute to a specified base.
 
@@ -59,13 +59,13 @@ Other functions you get when using rebase_attr:
 bill.id_without_rebase = 3151957185711
 bill.id
 => "2rnfkjw5f"
-Bill.find(Bill.decode("2rnfkjw5f"))
+Bill.find(Bill.decode_id("2rnfkjw5f"))
 => #<Bill id: 3151957185711>
-bill.decode("2rnfkjw5f")
+bill.decode_id("2rnfkjw5f")
 => 3151957185711
-Bill.encode(3151957185711)
+Bill.encode_id(3151957185711)
 => "2rnfkjw5f"
-bill.encode(3151957185711)
+bill.encode_id(3151957185711)
 => "2rnfkjw5f"
 ```
 

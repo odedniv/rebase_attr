@@ -12,6 +12,8 @@ module RebaseAttr
       attributes.each do |attr|
         # encoders & decoders
         define_singleton_method :"encode_#{attr}" do |decoded|
+          break nil if decoded.nil?
+
           result = decoded
           raise TypeError, "decoded value must implement #to_i, #{result.inspect} given" unless result.respond_to?(:to_i)
           result = result.to_i(from || 10) if result.is_a?(String)
@@ -25,6 +27,8 @@ module RebaseAttr
         end
 
         define_singleton_method :"decode_#{attr}" do |encoded|
+          break nil if encoded.nil?
+
           result = encoded
           if deconvert
             begin

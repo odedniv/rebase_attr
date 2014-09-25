@@ -17,31 +17,62 @@ describe RebaseAttr::Generator do
     describe "#encode" do
       specify { expect(klass.encode_x(decoded)).to eq(encoded) }
       specify { expect(instance.encode_x(decoded)).to eq(encoded) }
+      specify { expect(instance.encode_x(nil)).to be_nil }
     end
 
     describe "#decode" do
       specify { expect(klass.decode_x(encoded)).to eq(decoded) }
+      specify { expect(klass.decode_x(nil)).to be_nil }
       specify { expect(instance.decode_x(encoded)).to eq(decoded) }
+      specify { expect(instance.decode_x(nil)).to be_nil }
     end
 
     describe "reader" do
-      before { d = decoded; instance.instance_eval { @x = d } } # converting decoded to local variable so I can use it inside instance_eval
-      its(:x) { should == encoded }
+      context "when not nil" do
+        before { d = decoded; instance.instance_eval { @x = d } } # converting decoded to local variable so I can use it inside instance_eval
+        its(:x) { should == encoded }
+      end
+
+      context "when nil" do
+        before { instance.instance_eval { @x = nil } } # converting decoded to local variable so I can use it inside instance_eval
+        its(:x) { should be_nil }
+      end
     end
 
     describe "#without_rebase" do
-      before { d = decoded; instance.instance_eval { @x = d } } # converting decoded to local variable so I can use it inside instance_eval
-      its(:x_without_rebase) { should == decoded }
+      context "when not nil" do
+        before { d = decoded; instance.instance_eval { @x = d } } # converting decoded to local variable so I can use it inside instance_eval
+        its(:x_without_rebase) { should == decoded }
+      end
+
+      context "when nil" do
+        before { instance.instance_eval { @x = nil } } # converting decoded to local variable so I can use it inside instance_eval
+        its(:x_without_rebase) { should be_nil }
+      end
     end
 
     describe "writer" do
-      before { instance.x = encoded }
-      specify { expect(instance.instance_eval { @x }).to eq(decoded) }
+      context "when not nil" do
+        before { instance.x = encoded }
+        specify { expect(instance.instance_eval { @x }).to eq(decoded) }
+      end
+
+      context "when nil" do
+        before { instance.x = nil }
+        specify { expect(instance.instance_eval { @x }).to be_nil }
+      end
     end
 
     describe "#without_rebase=" do
-      before { instance.x_without_rebase = decoded }
-      specify { expect(instance.instance_eval { @x }).to eq(decoded) }
+      context "when not nil" do
+        before { instance.x_without_rebase = decoded }
+        specify { expect(instance.instance_eval { @x }).to eq(decoded) }
+      end
+
+      context "when nil" do
+        before { instance.x_without_rebase = nil }
+        specify { expect(instance.instance_eval { @x }).to be_nil }
+      end
     end
   end
 

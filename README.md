@@ -36,7 +36,7 @@ Example for an active record table with long IDs:
 #
 
 class Bill < ActiveRecord::Base
-  rebase_attr :id, base: 32, readable: true # only digits and leters, without '0', '1', 'i' and 'l'
+  rebase_attr :id, to: 32, readable: true # only digits and leters, without '0', 'o', '1' and 'l'
 end
 ```
 

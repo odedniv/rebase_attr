@@ -1,17 +1,49 @@
 require 'rebase_attr'
 
-class RebaseTestBase
+class RebaseWithAccessorTestBase
   attr_accessor :x
+end
+
+class RebaseWithoutAccessorTestBase
+  def method_missing(method, *args, &block)
+    case method
+      when :x
+        @x
+      when :x=
+        @x = args.first
+      else
+        super
+    end
+  end
 end
 
 # This converts options to local varaibels so they can be used inside the Class.new { }
 def rebase_class(**options, &block)
-  Class.new(RebaseTestBase) { rebase_attr(:x, **options, &block) }
+  Class.new(RebaseWithAccessorTestBase) { rebase_attr(:x, **options, &block) }
+end
+
+def rebase_classes(options_proc, &block)
+  context "with accessor" do
+    let(:klass) do
+      options = instance_eval(&options_proc) # converting to local variable before going inside the Class
+      Class.new(RebaseWithAccessorTestBase) { rebase_attr(:x, **options) }
+    end
+    @with_accessors = true
+    instance_eval(&block)
+  end
+  context "without accessor" do
+    let(:klass) do
+      options = instance_eval(&options_proc) # converting to local variable before going inside the Class
+      Class.new(RebaseWithoutAccessorTestBase) { rebase_attr(:x, **options) }
+    end
+    @with_accessors = false
+    instance_eval(&block)
+  end
 end
 
 describe RebaseAttr::Generator do
   #requires: decoded, encoded
-  shared_examples_for "values" do
+  shared_examples_for "values" do |with_accessors|
     subject(:instance) { klass.new }
 
     describe "#encode" do
@@ -41,13 +73,13 @@ describe RebaseAttr::Generator do
 
     describe "#without_rebase" do
       context "when not nil" do
-        before { d = decoded; instance.instance_eval { @x = d } } # converting decoded to local variable so I can use it inside instance_eval
-        its(:x_without_rebase) { should == decoded }
+        before { d = decoded; instance.instance_eval { @x = d } if with_accessors } # converting decoded to local variable so I can use it inside instance_eval
+        specify { expect(instance.x_without_rebase).to eq(decoded) if with_accessors }
       end
 
       context "when nil" do
-        before { instance.instance_eval { @x = nil } } # converting decoded to local variable so I can use it inside instance_eval
-        its(:x_without_rebase) { should be_nil }
+        before { instance.instance_eval { @x = nil } if with_accessors } # converting decoded to local variable so I can use it inside instance_eval
+        specify { expect(instance.x_without_rebase).to be_nil if with_accessors }
       end
     end
 
@@ -65,13 +97,13 @@ describe RebaseAttr::Generator do
 
     describe "#without_rebase=" do
       context "when not nil" do
-        before { instance.x_without_rebase = decoded }
-        specify { expect(instance.instance_eval { @x }).to eq(decoded) }
+        before { instance.x_without_rebase = decoded if with_accessors }
+        specify { expect(instance.instance_eval { @x }).to eq(decoded) if with_accessors }
       end
 
       context "when nil" do
-        before { instance.x_without_rebase = nil }
-        specify { expect(instance.instance_eval { @x }).to be_nil }
+        before { instance.x_without_rebase = nil if with_accessors }
+        specify { expect(instance.instance_eval { @x }).to be_nil if with_accessors }
       end
     end
   end
@@ -81,42 +113,47 @@ describe RebaseAttr::Generator do
   shared_context "all except readable" do
     context "without from" do
       context "not converted" do
-        let(:klass) { rebase_class to: to }
-        let(:decoded) { decoded_default }
-        let(:encoded) { encoded_default }
-        it_behaves_like "values"
+        rebase_classes proc { { to: to } } do
+          let(:decoded) { decoded_default }
+          let(:encoded) { encoded_default }
+          it_behaves_like "values", @with_accessors
+        end
       end
 
       context "converted" do
         context "named" do
-          let(:klass) { rebase_class to: to, convert: convert_name, deconvert: deconvert }
-          let(:decoded) { decoded_default }
-          let(:encoded) { encoded_convert }
-          it_behaves_like "values"
+          rebase_classes proc { { to: to, convert: convert_name, deconvert: deconvert } } do
+            let(:decoded) { decoded_default }
+            let(:encoded) { encoded_convert }
+            it_behaves_like "values", @with_accessors
+          end
         end
 
         context "block" do
-          let(:klass) { rebase_class to: to, convert: convert_block, deconvert: deconvert }
-          let(:decoded) { decoded_default }
-          let(:encoded) { encoded_convert }
-          it_behaves_like "values"
+          rebase_classes proc { { to: to, convert: convert_block, deconvert: deconvert } } do
+            let(:decoded) { decoded_default }
+            let(:encoded) { encoded_convert }
+            it_behaves_like "values", @with_accessors
+          end
         end
       end
     end
 
     context "from" do
       context "not converted" do
-        let(:klass) { rebase_class from: from, to: to }
-        let(:decoded) { decoded_from }
-        let(:encoded) { encoded_default }
-        it_behaves_like "values"
+        rebase_classes proc { { from: from, to: to } } do
+          let(:decoded) { decoded_from }
+          let(:encoded) { encoded_default }
+          it_behaves_like "values", @with_accessors
+        end
       end
 
       context "converted" do
-        let(:klass) { rebase_class from: from, to: to, convert: convert_name, deconvert: deconvert }
-        let(:decoded) { decoded_from }
-        let(:encoded) { encoded_convert }
-        it_behaves_like "values"
+        rebase_classes proc { { from: from, to: to, convert: convert_name, deconvert: deconvert } } do
+          let(:decoded) { decoded_from }
+          let(:encoded) { encoded_convert }
+          it_behaves_like "values", @with_accessors
+        end
       end
     end
   end
@@ -129,33 +166,37 @@ describe RebaseAttr::Generator do
     context "readable" do # 0 => x, 1 => y, l => w, o => z
       context "without from" do
         context "not converted" do
-          let(:klass) { rebase_class to: to, readable: true }
-          let(:decoded) { decoded_default }
-          let(:encoded) { encoded_readable }
-          it_behaves_like "values"
+          rebase_classes proc { { to: to, readable: true } } do
+            let(:decoded) { decoded_default }
+            let(:encoded) { encoded_readable }
+            it_behaves_like "values", @with_accessors
+          end
         end
 
         context "converted" do
-          let(:klass) { rebase_class to: to, readable: true, convert: convert_name, deconvert: deconvert }
-          let(:decoded) { decoded_default }
-          let(:encoded) { encoded_convert_readable }
-          it_behaves_like "values"
+          rebase_classes proc { { to: to, readable: true, convert: convert_name, deconvert: deconvert } } do
+            let(:decoded) { decoded_default }
+            let(:encoded) { encoded_convert_readable }
+            it_behaves_like "values", @with_accessors
+          end
         end
       end
 
       context "from" do
         context "not converted" do
-          let(:klass) { rebase_class from: from, to: to, readable: true }
-          let(:decoded) { decoded_from }
-          let(:encoded) { encoded_readable }
-          it_behaves_like "values"
+          rebase_classes proc { { from: from, to: to, readable: true } } do
+            let(:decoded) { decoded_from }
+            let(:encoded) { encoded_readable }
+            it_behaves_like "values", @with_accessors
+          end
         end
 
         context "converted" do
-          let(:klass) { rebase_class from: from, to: to, readable: true, convert: convert_name, deconvert: deconvert }
-          let(:decoded) { decoded_from }
-          let(:encoded) { encoded_convert_readable }
-          it_behaves_like "values"
+          rebase_classes proc { { from: from, to: to, readable: true, convert: convert_name, deconvert: deconvert } } do
+            let(:decoded) { decoded_from }
+            let(:encoded) { encoded_convert_readable }
+            it_behaves_like "values", @with_accessors
+          end
         end
       end
     end
@@ -235,26 +276,27 @@ describe RebaseAttr::Generator do
     specify { expect { rebase_class(to: 33, readable: true) }.to raise_error(ArgumentError, "#rebase_attr does not allow :readable option with bases higher than 32, 33 given") }
 
     context "input" do
-      let(:klass) { rebase_class(to: 16) }
-      let(:instance) { klass.new }
+      rebase_classes proc { { to: 16 } } do
+        let(:instance) { klass.new }
 
-      describe "#encode" do
-        specify { expect { klass.encode_x(:a) }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
-        specify { expect { instance.encode_x(:a) }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
-      end
+        describe "#encode" do
+          specify { expect { klass.encode_x(:a) }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
+          specify { expect { instance.encode_x(:a) }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
+        end
 
-      describe "#decode" do
-        specify { expect { klass.decode_x(:a) }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
-        specify { expect { instance.decode_x(:a) }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
-      end
+        describe "#decode" do
+          specify { expect { klass.decode_x(:a) }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
+          specify { expect { instance.decode_x(:a) }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
+        end
 
-      describe "reader" do
-        before { instance.instance_eval { @x = :a } }
-        specify { expect { instance.x }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
-      end
+        describe "reader" do
+          before { instance.instance_eval { @x = :a } }
+          specify { expect { instance.x }.to raise_error(TypeError, "decoded value must implement #to_i, :a given") }
+        end
 
-      describe "writer" do
-        specify { expect { instance.x = :a }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
+        describe "writer" do
+          specify { expect { instance.x = :a }.to raise_error(TypeError, "encoded value must implement #to_i, :a given") }
+        end
       end
     end
   end

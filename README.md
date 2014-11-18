@@ -78,7 +78,7 @@ rebase_attr :x, to: 16, readable: true, convert: :upcase
 rebase_attr :x, :y, from: 8, to: 2, convert: -> (v) { "b#{v}" }, deconvert: -> (v) { v[1..-1] }
 ```
 
-Example usage on your own class (not ActiveRecord):
+Example usage on your own class (not `ActiveRecord`):
 
 ```ruby
 class Bill
